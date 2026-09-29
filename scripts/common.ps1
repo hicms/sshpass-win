@@ -33,6 +33,15 @@ function Get-RepositoryRoot {
     Split-Path -Parent $PSScriptRoot
 }
 
+# Returns the path of the release notes for a tag such as v0.1.0.
+function Get-ReleaseNotesPath {
+    param(
+        [Parameter(Mandatory)][string]$Root,
+        [Parameter(Mandatory)][string]$Tag
+    )
+    Join-Path $Root "docs\release-notes\$Tag.md"
+}
+
 # Reads the package version from Cargo.toml.
 function Get-CargoVersion {
     param([Parameter(Mandatory)][string]$Root)

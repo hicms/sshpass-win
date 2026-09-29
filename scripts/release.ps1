@@ -10,7 +10,9 @@ pushes both. The push of the tag makes the GitHub Actions workflow build the
 executable and create the GitHub release.
 
 .PARAMETER Version
-The new version, as X.Y.Z. It must be higher than the current one.
+The new version, as X.Y.Z. It must not be lower than the current one; the
+same version is fine for a first release. Release notes must exist in
+docs\release-notes\vX.Y.Z.md.
 
 .PARAMETER DryRun
 Only check the preconditions and print what would happen.
@@ -42,8 +44,12 @@ $root = Get-RepositoryRoot
 
 function Assert-ReleasePreconditions {
     param([Parameter(Mandatory)][string]$current)
-    if ([version]$Version -le [version]$current) {
-        throw "Version $Version must be higher than the current version $current"
+    if ([version]$Version -lt [version]$current) {
+        throw "Version $Version must not be lower than the current version $current"
+    }
+    $notes = Get-ReleaseNotesPath $root $tag
+    if (-not (Test-Path $notes) -or -not (Get-Content $notes -Raw).Trim()) {
+        throw "Write the release notes first: $notes"
     }
 
     $onBranch = Get-NativeOutput git @('rev-parse', '--abbrev-ref', 'HEAD')
@@ -86,9 +92,9 @@ try {
 
     if ($DryRun) {
         Write-Host 'Dry run: preconditions hold. A real run would:'
-        Write-Host "  1. set version = `"$Version`" in Cargo.toml"
+        Write-Host "  1. set version = `"$Version`" in Cargo.toml (if it differs)"
         Write-Host '  2. run scripts\build.ps1 (fmt, clippy, tests, release build)'
-        Write-Host "  3. commit 'Release $tag' and create the annotated tag $tag"
+        Write-Host "  3. commit 'Release $tag' (if the version changed) and create the annotated tag $tag"
         Write-Host "  4. push $Branch and $tag to $Remote"
         return
     }
@@ -101,7 +107,9 @@ try {
     }
 
     try {
-        Set-CargoVersion
+        if ($Version -ne $current) {
+            Set-CargoVersion
+        }
         & (Join-Path $PSScriptRoot 'build.ps1')
     }
     catch {
@@ -111,7 +119,9 @@ try {
     }
 
     Invoke-Native git @('add', 'Cargo.toml', 'Cargo.lock')
-    Invoke-Native git @('commit', '-m', "Release $tag")
+    if (Get-NativeOutput git @('diff', '--cached', '--name-only')) {
+        Invoke-Native git @('commit', '-m', "Release $tag")
+    }
     Invoke-Native git @('tag', '-a', $tag, '-m', "Release $tag")
     Invoke-Native git @('push', '--atomic', $Remote, $Branch, $tag)
 

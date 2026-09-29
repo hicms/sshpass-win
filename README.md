@@ -10,6 +10,27 @@ the password prompt and types the password for you.
 Windows 10 version 1809 (build 17763) or later, which provides ConPTY. The
 binary is statically linked and needs no Visual C++ runtime.
 
+## Install
+
+Download `sshpass.exe` and `sshpass.exe.sha256` from the
+[releases](https://github.com/hicms/sshpass-win/releases).
+
+```powershell
+$expected = (Get-Content .\sshpass.exe.sha256).Split(' ')[0]
+$actual = (Get-FileHash .\sshpass.exe -Algorithm SHA256).Hash.ToLower()
+if ($actual -eq $expected) { 'OK' } else { 'MISMATCH' }
+
+$dir = "$env:LOCALAPPDATA\Programs\sshpass"
+New-Item -ItemType Directory -Force $dir | Out-Null
+Copy-Item .\sshpass.exe $dir
+$path = [Environment]::GetEnvironmentVariable('Path', 'User')
+if (($path -split ';') -notcontains $dir) {
+    [Environment]::SetEnvironmentVariable('Path', "$path;$dir", 'User')
+}
+```
+
+Open a new terminal and run `sshpass -h`.
+
 ## Build
 
 ```powershell
@@ -105,11 +126,12 @@ executable itself) inside a pseudo console; they need no network.
 .\scripts\release.ps1 -Version 0.2.0
 ```
 
-The script requires a clean, up-to-date `main`, sets the version in
-`Cargo.toml`, runs `scripts\build.ps1`, commits `Release v0.2.0`, creates the tag
+The script requires a clean, up-to-date `main` and release notes in
+`docs\release-notes\v0.2.0.md`. It sets the version in `Cargo.toml` when it
+differs, runs `scripts\build.ps1`, commits the version change, creates the tag
 `v0.2.0` and pushes both. Pushing the tag starts the GitHub Actions workflow,
-which builds the executable and publishes it, with its checksum, as a GitHub
-release.
+which builds the executable and publishes the release notes, the executable and
+its checksum as a GitHub release.
 
 ## License
 

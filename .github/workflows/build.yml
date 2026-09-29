@@ -14,16 +14,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check the tag matches the crate version
+      - name: Check the tag matches the crate version and has release notes
         if: startsWith(github.ref, 'refs/tags/')
         shell: pwsh
         env:
           TAG: ${{ github.ref_name }}
         run: |
           . ./scripts/common.ps1
-          $crate = Get-CargoVersion (Get-Location).Path
+          $root = (Get-Location).Path
+          $crate = Get-CargoVersion $root
           if ($env:TAG -ne "v$crate") {
             throw "Tag $env:TAG does not match Cargo.toml version $crate"
+          }
+          $notes = Get-ReleaseNotesPath $root $env:TAG
+          if (-not (Test-Path $notes)) {
+            throw "Missing release notes: $notes"
           }
 
       - name: Check and build
@@ -43,6 +48,8 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           name: sshpass
@@ -51,7 +58,8 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
+          name: sshpass ${{ github.ref_name }}
+          body_path: docs/release-notes/${{ github.ref_name }}.md
           files: |
             dist/sshpass.exe
             dist/sshpass.exe.sha256
-          generate_release_notes: true

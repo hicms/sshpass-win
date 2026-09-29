@@ -1,0 +1,9 @@
+# Cargo build output
+/target
+
+# Release packages produced by scripts/build.ps1
+/dist
+
+# rustfmt backups and Windows debug symbols
+**/*.rs.bk
+*.pdb

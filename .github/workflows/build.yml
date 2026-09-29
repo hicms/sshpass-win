@@ -1,0 +1,57 @@
+name: build
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the tag matches the crate version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          . ./scripts/common.ps1
+          $crate = Get-CargoVersion (Get-Location).Path
+          if ($env:TAG -ne "v$crate") {
+            throw "Tag $env:TAG does not match Cargo.toml version $crate"
+          }
+
+      - name: Check and build
+        shell: pwsh
+        run: ./scripts/build.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sshpass
+          path: dist/
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: sshpass
+          path: dist
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/sshpass.exe
+            dist/sshpass.exe.sha256
+          generate_release_notes: true
